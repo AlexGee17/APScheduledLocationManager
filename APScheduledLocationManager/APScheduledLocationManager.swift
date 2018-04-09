@@ -50,8 +50,6 @@ public class APScheduledLocationManager: NSObject, CLLocationManagerDelegate {
     private func configureLocationManager(){
         
         manager.allowsBackgroundLocationUpdates = true
-        manager.desiredAccuracy = kCLLocationAccuracyBest
-        manager.distanceFilter = kCLDistanceFilterNone
         manager.pausesLocationUpdatesAutomatically = false
         manager.delegate = self
     }
@@ -68,6 +66,7 @@ public class APScheduledLocationManager: NSObject, CLLocationManagerDelegate {
             stopUpdatingLocation()
         }
         
+        checkLocationInterval -= WaitForLocationsTime
         checkLocationInterval = interval > MaxBGTime ? MaxBGTime : interval
         checkLocationInterval = interval < MinBGTime ? MinBGTime : interval
         
@@ -110,6 +109,8 @@ public class APScheduledLocationManager: NSObject, CLLocationManagerDelegate {
     private func startLocationManager() {
         
         isManagerRunning = true
+        manager.desiredAccuracy = kCLLocationAccuracyBest
+        manager.distanceFilter = kCLDistanceFilterNone
         manager.startUpdatingLocation()
     }
     
@@ -117,6 +118,11 @@ public class APScheduledLocationManager: NSObject, CLLocationManagerDelegate {
         
         isManagerRunning = false
         manager.stopUpdatingLocation()
+    }
+    
+    private func pauseLocationManager(){
+        manager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
+        manager.distanceFilter = 99999
     }
     
     @objc func applicationDidEnterBackground() {
@@ -141,9 +147,10 @@ public class APScheduledLocationManager: NSObject, CLLocationManagerDelegate {
     }
     
     public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        
+//        print("LOCATIONS ARE: \(locations)")
         guard isManagerRunning else { return }
-        guard locations.count>0 else { return }
+        guard locations.count > 0 else { return }
+        guard manager.desiredAccuracy == kCLLocationAccuracyBest else {return}
         
         lastLocations = locations
         
@@ -168,7 +175,7 @@ public class APScheduledLocationManager: NSObject, CLLocationManagerDelegate {
         }
     }
     
-    func checkLocationTimerEvent() {
+    @objc func checkLocationTimerEvent() {
 
         stopCheckLocationTimer()
         
@@ -193,7 +200,7 @@ public class APScheduledLocationManager: NSObject, CLLocationManagerDelegate {
         }
     }
     
-    func waitTimerEvent() {
+    @objc func waitTimerEvent() {
         
         stopWaitTimer()
         
@@ -201,7 +208,8 @@ public class APScheduledLocationManager: NSObject, CLLocationManagerDelegate {
             
             startBackgroundTask()
             startCheckLocationTimer()
-            stopLocationManager()
+            //stopLocationManager()
+            pauseLocationManager()
             
             delegate.scheduledLocationManager(self, didUpdateLocations: lastLocations)
         }else{
@@ -213,11 +221,11 @@ public class APScheduledLocationManager: NSObject, CLLocationManagerDelegate {
     private func acceptableLocationAccuracyRetrieved() -> Bool {
         
         let location = lastLocations.last!
-        
+//        print("ACCURACY: = \(location.horizontalAccuracy)")
         return location.horizontalAccuracy <= acceptableLocationAccuracy ? true : false
     }
    
-    func stopAndResetBgTaskIfNeeded()  {
+    @objc func stopAndResetBgTaskIfNeeded()  {
         
         if isManagerRunning {
             stopBackgroundTask()
